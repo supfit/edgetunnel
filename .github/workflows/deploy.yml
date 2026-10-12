@@ -1,4 +1,4 @@
-name: Deploy EdgeTunnel to Cloudflare Workers
+name: Deploy EdgeTunnel to Cloudflare Pages
 
 on:
   push:
@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy Worker
+    name: Deploy Pages
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -40,11 +40,16 @@ jobs:
           echo "id=${ID}" >> "${GITHUB_OUTPUT}"
           echo "KV namespace id: ${ID}"
 
+      - name: Prepare Pages output directory
+        run: |
+          mkdir -p _dist
+          cp _worker.js _dist/
+
       - name: Write wrangler.toml
         run: |
           cat > wrangler.toml <<'EOF'
-          name = "api-relay-svc"
-          main = "_worker.js"
+          name = "cdn-web-console"
+          pages_build_output_dir = "_dist"
           compatibility_date = "2025-11-04"
           kv_namespaces = [{ binding = "KV", id = "${{ steps.kv.outputs.id }}" }]
 
@@ -54,8 +59,9 @@ jobs:
           EOF
           cat wrangler.toml
 
-      - name: Deploy to Cloudflare Workers
+      - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy _dist --project-name=cdn-web-console --branch=main
