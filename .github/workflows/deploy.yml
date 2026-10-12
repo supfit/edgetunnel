@@ -46,8 +46,11 @@ jobs:
           name = "edgetunnel"
           main = "_worker.js"
           compatibility_date = "2025-11-04"
-          keep_vars = true
           kv_namespaces = [{ binding = "KV", id = "${{ steps.kv.outputs.id }}" }]
+
+          [vars]
+          ADMIN = "${{ secrets.ADMIN }}"
+          UUID = "${{ secrets.UUID }}"
           EOF
           cat wrangler.toml
 
@@ -56,6 +59,3 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          vars: |
-            ADMIN: ${{ secrets.ADMIN }}
-            UUID: ${{ secrets.UUID }}
