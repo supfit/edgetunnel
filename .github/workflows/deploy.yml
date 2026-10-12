@@ -1,0 +1,61 @@
+name: Deploy EdgeTunnel to Cloudflare Workers
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-edgetunnel
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Worker
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure KV namespace exists
+        id: kv
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          API="https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces"
+          AUTH="Authorization: Bearer ${CF_API_TOKEN}"
+          ID=$(curl -sf "${API}?per_page=100" -H "${AUTH}" \
+            | jq -r '.result[] | select(.title=="edgetunnel-kv") | .id' | head -n1)
+          if [ -z "${ID}" ]; then
+            echo "KV namespace not found, creating..."
+            ID=$(curl -sf -X POST "${API}" -H "${AUTH}" -H "Content-Type: application/json" \
+              --data '{"title":"edgetunnel-kv"}' | jq -r '.result.id')
+          fi
+          test -n "${ID}"
+          echo "id=${ID}" >> "${GITHUB_OUTPUT}"
+          echo "KV namespace id: ${ID}"
+
+      - name: Write wrangler.toml
+        run: |
+          cat > wrangler.toml <<'EOF'
+          name = "edgetunnel"
+          main = "_worker.js"
+          compatibility_date = "2025-11-04"
+          keep_vars = true
+          kv_namespaces = [{ binding = "KV", id = "${{ steps.kv.outputs.id }}" }]
+          EOF
+          cat wrangler.toml
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          vars: |
+            ADMIN: ${{ secrets.ADMIN }}
+            UUID: ${{ secrets.UUID }}
