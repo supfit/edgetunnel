@@ -40,6 +40,24 @@ jobs:
           echo "id=${ID}" >> "${GITHUB_OUTPUT}"
           echo "KV namespace id: ${ID}"
 
+      - name: Ensure Pages project exists
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          API="https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects"
+          AUTH="Authorization: Bearer ${CF_API_TOKEN}"
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" "${API}/cdn-web-console" -H "${AUTH}")
+          if [ "${CODE}" = "404" ]; then
+            echo "Pages project not found, creating..."
+            curl -sf -X POST "${API}" -H "${AUTH}" -H "Content-Type: application/json" \
+              --data '{"name":"cdn-web-console","production_branch":"main"}' > /dev/null
+            echo "Pages project created."
+          else
+            echo "Pages project already exists."
+          fi
+
       - name: Prepare Pages output directory
         run: |
           mkdir -p _dist
@@ -64,4 +82,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy _dist --project-name=cdn-web-console --branch=main
+          command: pages deploy _dist --project-name=cdn-web-console --branch=main --commit-dirty=true
