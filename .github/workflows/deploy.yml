@@ -30,11 +30,11 @@ jobs:
           API="https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces"
           AUTH="Authorization: Bearer ${CF_API_TOKEN}"
           ID=$(curl -sf "${API}?per_page=100" -H "${AUTH}" \
-            | jq -r '.result[] | select(.title=="edgetunnel-kv") | .id' | head -n1)
+            | jq -r '.result[] | select(.title=="app-data-store") | .id' | head -n1)
           if [ -z "${ID}" ]; then
             echo "KV namespace not found, creating..."
             ID=$(curl -sf -X POST "${API}" -H "${AUTH}" -H "Content-Type: application/json" \
-              --data '{"title":"edgetunnel-kv"}' | jq -r '.result.id')
+              --data '{"title":"app-data-store"}' | jq -r '.result.id')
           fi
           test -n "${ID}"
           echo "id=${ID}" >> "${GITHUB_OUTPUT}"
@@ -43,7 +43,7 @@ jobs:
       - name: Write wrangler.toml
         run: |
           cat > wrangler.toml <<'EOF'
-          name = "edgetunnel"
+          name = "api-relay-svc"
           main = "_worker.js"
           compatibility_date = "2025-11-04"
           kv_namespaces = [{ binding = "KV", id = "${{ steps.kv.outputs.id }}" }]
